@@ -1,0 +1,10 @@
+# Firebase configuration for the local project
+GoogleService-Info.plist
+
+# Personal Xcode state
+xcuserdata/
+*.xcuserstate
+
+# Build products
+DerivedData/
+.build/

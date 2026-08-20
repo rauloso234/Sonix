@@ -1,0 +1,150 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function playlistDocument(playlistId) {
+      return get(/databases/$(database)/documents/playlists/$(playlistId));
+    }
+
+    function playlistAfter(playlistId) {
+      return getAfter(/databases/$(database)/documents/playlists/$(playlistId));
+    }
+
+    function isPlaylistOwner(playlistId) {
+      return isSignedIn() && playlistDocument(playlistId).data.ownerId == request.auth.uid;
+    }
+
+    function isPlaylistMember(playlistId) {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/playlists/$(playlistId)/members/$(request.auth.uid));
+    }
+
+    function memberRole(playlistId) {
+      return get(/databases/$(database)/documents/playlists/$(playlistId)/members/$(request.auth.uid)).data.role;
+    }
+
+    function canEditPlaylist(playlistId) {
+      return isPlaylistOwner(playlistId)
+        || (isPlaylistMember(playlistId) && memberRole(playlistId) == "editor");
+    }
+
+    function validPlaylist(playlistId) {
+      return request.resource.data.id == playlistId
+        && request.resource.data.name is string
+        && request.resource.data.ownerId is string
+        && request.resource.data.isCollaborative is bool
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.updatedAt is timestamp;
+    }
+
+    match /users/{userId} {
+      allow create: if isSignedIn() && userId == request.auth.uid
+        && request.resource.data.id == request.auth.uid;
+      allow read: if isSignedIn() && userId == request.auth.uid;
+      allow update: if isSignedIn() && userId == request.auth.uid
+        && request.resource.data.id == resource.data.id;
+      allow delete: if false;
+    }
+
+    match /playlists/{playlistId} {
+      allow create: if isSignedIn() && validPlaylist(playlistId)
+        && request.resource.data.ownerId == request.auth.uid;
+
+      // Conserva compatibilidad con whereField("ownerId", isEqualTo: uid).
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow get: if isSignedIn() && (
+        resource.data.ownerId == request.auth.uid
+        || resource.data.visibility == "public"
+        || isPlaylistMember(playlistId)
+      );
+
+      allow update: if (
+        isPlaylistOwner(playlistId) && validPlaylist(playlistId)
+          && request.resource.data.ownerId == resource.data.ownerId
+          && request.resource.data.id == resource.data.id
+          && request.resource.data.createdAt == resource.data.createdAt
+      ) || (
+        canEditPlaylist(playlistId)
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(["trackCount", "nextTrackPosition", "updatedAt"])
+          && request.resource.data.trackCount == resource.data.get("trackCount", 0) + 1
+          && request.resource.data.nextTrackPosition
+            == resource.data.get("nextTrackPosition", resource.data.get("trackCount", 0)) + 1
+          && request.resource.data.ownerId == resource.data.ownerId
+      );
+      allow delete: if isPlaylistOwner(playlistId);
+
+      match /members/{userId} {
+        allow read: if isPlaylistOwner(playlistId) || isPlaylistMember(playlistId);
+
+        allow create: if isSignedIn() && request.resource.data.userId == userId && (
+          // Alta atómica del propietario al crear la playlist.
+          (userId == request.auth.uid
+            && request.resource.data.role == "owner"
+            && playlistAfter(playlistId).data.ownerId == request.auth.uid)
+          ||
+          // Alta propia usando una invitación activa para esta playlist.
+          (userId == request.auth.uid
+            && request.resource.data.role == "editor"
+            && request.resource.data.inviteCode is string
+            && get(/databases/$(database)/documents/playlistInvites/$(request.resource.data.inviteCode)).data.active == true
+            && get(/databases/$(database)/documents/playlistInvites/$(request.resource.data.inviteCode)).data.playlistId == playlistId
+            && playlistDocument(playlistId).data.isCollaborative == true)
+          ||
+          // El propietario puede invitar directamente como editor o lector.
+          (isPlaylistOwner(playlistId) && request.resource.data.role in ["editor", "viewer"])
+        );
+
+        allow update: if isPlaylistOwner(playlistId)
+          && userId != playlistDocument(playlistId).data.ownerId
+          && request.resource.data.userId == resource.data.userId
+          && request.resource.data.role in ["editor", "viewer"];
+
+        allow delete: if isPlaylistOwner(playlistId)
+          && userId != playlistDocument(playlistId).data.ownerId
+          || (isSignedIn() && userId == request.auth.uid && resource.data.role != "owner");
+      }
+
+      match /tracks/{trackId} {
+        allow read: if isPlaylistOwner(playlistId) || isPlaylistMember(playlistId)
+          || playlistDocument(playlistId).data.visibility == "public";
+        allow create: if canEditPlaylist(playlistId)
+          && request.resource.data.addedBy == request.auth.uid
+          && request.resource.data.position is int;
+        allow update, delete: if canEditPlaylist(playlistId);
+      }
+    }
+
+    match /playlistInvites/{code} {
+      allow get: if isSignedIn();
+      allow list: if false;
+      allow create: if isSignedIn()
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.playlistId is string
+        && playlistAfter(request.resource.data.playlistId).data.ownerId == request.auth.uid;
+      allow update, delete: if isSignedIn()
+        && resource.data.ownerId == request.auth.uid
+        && isPlaylistOwner(resource.data.playlistId);
+    }
+
+    match /userPlaylists/{userId}/items/{playlistId} {
+      allow read: if isSignedIn() && userId == request.auth.uid;
+      allow create: if isSignedIn() && userId == request.auth.uid
+        && request.resource.data.playlistId == playlistId && (
+          (request.resource.data.type == "owned"
+            && request.resource.data.role == "owner"
+            && playlistAfter(playlistId).data.ownerId == request.auth.uid)
+          ||
+          (request.resource.data.type == "collaborative"
+            && request.resource.data.role == "editor"
+            && getAfter(/databases/$(database)/documents/playlists/$(playlistId)/members/$(request.auth.uid)).data.role == "editor")
+        );
+      allow update: if false;
+      allow delete: if isSignedIn() && userId == request.auth.uid;
+    }
+  }
+}
