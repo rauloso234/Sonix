@@ -7,7 +7,7 @@ struct AddToPlaylistView: View {
     @Environment(PlaylistViewModel.self) private var playlistViewModel
 
     private var editablePlaylists: [Playlist] {
-        playlistViewModel.ownedPlaylists + playlistViewModel.collaborativePlaylists
+        playlistViewModel.editablePlaylists
     }
 
     var body: some View {

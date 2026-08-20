@@ -5,6 +5,7 @@
 //  Created by Raul Fernandez on 19/08/2026.
 //
 
+import FirebaseAuth
 import SwiftUI
 
 @main
@@ -23,11 +24,26 @@ struct AppDePruebaApp: App {
     @State private var searchViewModel = SearchViewModel(
         repository: MusicRepository(
             provider: YouTubeKitMusicProvider(searchProvider: PipedSearchProvider())
-        )
+        ),
+        playlistRepository: FirebasePlaylistRepository(service: FirestoreService())
     )
     @State private var playerManager = PlayerManager(
         repository: MusicRepository(
             provider: YouTubeKitMusicProvider(searchProvider: PipedSearchProvider())
+        ),
+        nowPlayingService: SystemNowPlayingService(),
+        recommendationService: MusicRecommendationService(
+            repository: MusicRepository(
+                provider: YouTubeKitMusicProvider(searchProvider: PipedSearchProvider())
+            )
+        ),
+        historyRepository: FirebaseRecentlyPlayedRepository(service: FirestoreRecentlyPlayedService()),
+        currentUserID: { Auth.auth().currentUser?.uid }
+    )
+    @State private var homeViewModel = HomeViewModel(
+        historyRepository: FirebaseRecentlyPlayedRepository(service: FirestoreRecentlyPlayedService()),
+        recommendationService: MusicRecommendationService(
+            repository: MusicRepository(provider: YouTubeKitMusicProvider(searchProvider: PipedSearchProvider()))
         )
     )
 
@@ -40,6 +56,7 @@ struct AppDePruebaApp: App {
                 .environment(playlistDetailViewModel)
                 .environment(searchViewModel)
                 .environment(playerManager)
+                .environment(homeViewModel)
         }
     }
 }

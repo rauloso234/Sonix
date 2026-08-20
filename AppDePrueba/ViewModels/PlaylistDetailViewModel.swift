@@ -15,7 +15,7 @@ final class PlaylistDetailViewModel {
 
     init(repository: PlaylistRepositoryProtocol) { self.repository = repository }
 
-    func start(playlistId: String) {
+    func start(playlistId: String, observeMembers: Bool = true) {
         stop()
         isLoading = true
         errorMessage = nil
@@ -28,6 +28,10 @@ final class PlaylistDetailViewModel {
                 case .failure(let error): self.errorMessage = self.message(for: error)
                 }
             }
+        }
+        guard observeMembers else {
+            members = []
+            return
         }
         membersListener = repository.observeMembers(playlistId: playlistId) { [weak self] result in
             Task { @MainActor in

@@ -13,7 +13,9 @@ struct MiniPlayerView: View {
                 Button(action: openPlayer) {
                     VStack(alignment: .leading) {
                         Text(track.title).lineLimit(1)
-                        Text(playerManager.isLoading ? "Cargando…" : track.artist)
+                        Text(playerManager.isLoadingRecommendations
+                             ? "Buscando canciones similares…"
+                             : (playerManager.isLoading ? "Cargando…" : track.artist))
                             .font(.caption).foregroundStyle(AppTheme.Colors.secondaryText).lineLimit(1)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)

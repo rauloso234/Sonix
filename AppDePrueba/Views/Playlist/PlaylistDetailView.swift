@@ -1,20 +1,32 @@
 import SwiftUI
 
 struct PlaylistDetailView: View {
+    private let actionColumns = [
+        GridItem(.flexible(), spacing: AppTheme.Spacing.small),
+        GridItem(.flexible(), spacing: AppTheme.Spacing.small)
+    ]
     let playlist: Playlist
     @Environment(AuthViewModel.self) private var authViewModel
     @Environment(PlaylistDetailViewModel.self) private var viewModel
     @Environment(PlayerManager.self) private var playerManager
+    @Environment(PlaylistViewModel.self) private var playlistViewModel
     @State private var showingInvite = false
     @State private var showingMembers = false
     @State private var showingSearch = false
+    @State private var showingEdit = false
 
     private var currentRole: PlaylistRole? { viewModel.role(for: authViewModel.currentUser?.id) }
     private var canEditTracks: Bool {
-        authViewModel.currentUser?.id == playlist.ownerId || currentRole?.canEditTracks == true
+        PlaylistAccessPolicy.canEditTracks(
+            userId: authViewModel.currentUser?.id,
+            playlist: playlist,
+            role: currentRole
+        )
     }
-    private var ownerName: String {
-        viewModel.members.first { $0.userId == playlist.ownerId }?.displayName ?? "Propietario"
+    private var ownerName: String { playlist.ownerDisplayName }
+    private var isOwner: Bool { authViewModel.currentUser?.id == playlist.ownerId }
+    private var isIndexedCollaborator: Bool {
+        playlistViewModel.collaborativePlaylists.contains { $0.id == playlist.id }
     }
 
     var body: some View {
@@ -36,7 +48,10 @@ struct PlaylistDetailView: View {
             NavigationStack { PlaylistMembersView(members: viewModel.members) }
         }
         .sheet(isPresented: $showingSearch) { NavigationStack { SearchView() } }
-        .task(id: playlist.id) { viewModel.start(playlistId: playlist.id) }
+        .sheet(isPresented: $showingEdit) { EditPlaylistView(playlist: playlist) }
+        .task(id: playlist.id) {
+            viewModel.start(playlistId: playlist.id, observeMembers: isOwner || isIndexedCollaborator)
+        }
         .onDisappear { viewModel.stop() }
     }
 
@@ -52,7 +67,7 @@ struct PlaylistDetailView: View {
             Text(playlist.name).font(.largeTitle.bold())
             if !playlist.description.isEmpty { Text(playlist.description).foregroundStyle(AppTheme.Colors.secondaryText) }
             Text("De \(ownerName)").font(.subheadline)
-            Label("\(viewModel.members.count) miembros · \(viewModel.tracks.count) canciones",
+            Label("\(playlist.memberCount) miembros · \(viewModel.tracks.count) canciones",
                   systemImage: playlist.isCollaborative ? "person.2.fill" : "music.note.list")
                 .foregroundStyle(AppTheme.Colors.secondaryText)
         }
@@ -64,14 +79,31 @@ struct PlaylistDetailView: View {
                 if !viewModel.tracks.isEmpty { playerManager.playQueue(viewModel.tracks, startingAt: 0) }
             }
                 .buttonStyle(.borderedProminent).disabled(viewModel.tracks.isEmpty).frame(maxWidth: .infinity)
-            HStack {
-                Button("Añadir canción", systemImage: "plus") { showingSearch = true }
-                    .buttonStyle(.bordered).disabled(!canEditTracks)
-                Button("Miembros", systemImage: "person.2") { showingMembers = true }
-                    .buttonStyle(.bordered)
-                if playlist.isCollaborative, playlist.joinCode != nil {
-                    Button("Invitar", systemImage: "square.and.arrow.up") { showingInvite = true }
-                        .buttonStyle(.bordered)
+            if canShowFollowControl, let user = authViewModel.currentUser {
+                Button(playlistViewModel.isFollowing(playlist) ? "Siguiendo" : "Seguir",
+                       systemImage: playlistViewModel.isFollowing(playlist) ? "checkmark.circle.fill" : "plus.circle") {
+                    Task {
+                        if playlistViewModel.isFollowing(playlist) {
+                            _ = await playlistViewModel.unfollow(playlist, user: user)
+                        } else {
+                            _ = await playlistViewModel.follow(playlist, user: user)
+                        }
+                    }
+                }
+                .buttonStyle(.bordered)
+            }
+            LazyVGrid(columns: actionColumns, spacing: AppTheme.Spacing.small) {
+                if isOwner {
+                    actionButton(title: "Editar", systemImage: "pencil") { showingEdit = true }
+                }
+                if canEditTracks {
+                    actionButton(title: "Añadir canción", systemImage: "plus") { showingSearch = true }
+                }
+                if isOwner || isIndexedCollaborator {
+                    actionButton(title: "Miembros", systemImage: "person.2") { showingMembers = true }
+                }
+                if isOwner, playlist.isCollaborative, playlist.joinCode != nil {
+                    actionButton(title: "Invitar", systemImage: "square.and.arrow.up") { showingInvite = true }
                 }
             }
             if !canEditTracks {
@@ -79,6 +111,31 @@ struct PlaylistDetailView: View {
                     .font(.caption).foregroundStyle(AppTheme.Colors.secondaryText)
             }
         }
+    }
+
+    private func actionButton(
+        title: String,
+        systemImage: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: systemImage)
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(maxWidth: .infinity, minHeight: 48)
+                .padding(.horizontal, AppTheme.Spacing.small)
+                .background(AppTheme.Colors.elevatedSurface)
+                .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.small))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var canShowFollowControl: Bool {
+        guard playlist.visibility == .publicVisible,
+              let userId = authViewModel.currentUser?.id,
+              userId != playlist.ownerId else { return false }
+        return currentRole == nil && !isIndexedCollaborator
     }
 
     @ViewBuilder

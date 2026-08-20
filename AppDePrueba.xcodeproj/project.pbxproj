@@ -13,14 +13,30 @@
 		A20000000000000000000003 /* YouTubeKit in Frameworks */ = {isa = PBXBuildFile; productRef = A20000000000000000000002 /* YouTubeKit */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		B30000000000000000000007 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8339398430361D2700497283 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 8339398B30361D2700497283;
+			remoteInfo = AppDePrueba;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		8339398C30361D2700497283 /* AppDePrueba.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AppDePrueba.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B30000000000000000000001 /* AppDePruebaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AppDePruebaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		8339398E30361D2700497283 /* AppDePrueba */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = AppDePrueba;
+			sourceTree = "<group>";
+		};
+		B30000000000000000000002 /* AppDePruebaTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = AppDePruebaTests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -37,6 +53,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B30000000000000000000004 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -44,6 +67,7 @@
 			isa = PBXGroup;
 			children = (
 				8339398E30361D2700497283 /* AppDePrueba */,
+				B30000000000000000000002 /* AppDePruebaTests */,
 				8339398D30361D2700497283 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -52,6 +76,7 @@
 			isa = PBXGroup;
 			children = (
 				8339398C30361D2700497283 /* AppDePrueba.app */,
+				B30000000000000000000001 /* AppDePruebaTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -85,6 +110,27 @@
 			productReference = 8339398C30361D2700497283 /* AppDePrueba.app */;
 			productType = "com.apple.product-type.application";
 		};
+		B30000000000000000000003 /* AppDePruebaTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B30000000000000000000009 /* Build configuration list for PBXNativeTarget "AppDePruebaTests" */;
+			buildPhases = (
+				B30000000000000000000006 /* Sources */,
+				B30000000000000000000004 /* Frameworks */,
+				B30000000000000000000005 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				B30000000000000000000008 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				B30000000000000000000002 /* AppDePruebaTests */,
+			);
+			name = AppDePruebaTests;
+			productName = AppDePruebaTests;
+			productReference = B30000000000000000000001 /* AppDePruebaTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -97,6 +143,10 @@
 				TargetAttributes = {
 					8339398B30361D2700497283 = {
 						CreatedOnToolsVersion = 26.6;
+					};
+					B30000000000000000000003 = {
+						CreatedOnToolsVersion = 26.6;
+						TestTargetID = 8339398B30361D2700497283;
 					};
 				};
 			};
@@ -119,12 +169,20 @@
 			projectRoot = "";
 			targets = (
 				8339398B30361D2700497283 /* AppDePrueba */,
+				B30000000000000000000003 /* AppDePruebaTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		8339398A30361D2700497283 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B30000000000000000000005 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -141,7 +199,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B30000000000000000000006 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		B30000000000000000000008 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 8339398B30361D2700497283 /* AppDePrueba */;
+			targetProxy = B30000000000000000000007 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		8339399530361D2700497283 /* Debug */ = {
@@ -270,8 +343,10 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 54K9QFV45K;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "AppDePrueba-Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -301,8 +376,10 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 54K9QFV45K;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "AppDePrueba-Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -325,6 +402,46 @@
 			};
 			name = Release;
 		};
+		B3000000000000000000000A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.raulfernandez.AppDePruebTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/AppDePrueba.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/AppDePrueba";
+			};
+			name = Debug;
+		};
+		B3000000000000000000000B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.raulfernandez.AppDePruebTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/AppDePrueba.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/AppDePrueba";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -342,6 +459,15 @@
 			buildConfigurations = (
 				8339399830361D2700497283 /* Debug */,
 				8339399930361D2700497283 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B30000000000000000000009 /* Build configuration list for PBXNativeTarget "AppDePruebaTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B3000000000000000000000A /* Debug */,
+				B3000000000000000000000B /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

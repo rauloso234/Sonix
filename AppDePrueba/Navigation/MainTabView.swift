@@ -29,11 +29,11 @@ struct MainTabView: View {
             .tabItem { Label("Biblioteca", systemImage: "music.note.list") }
             .tag(AppTab.library)
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            if playerManager.currentTrack != nil {
-                MiniPlayerView { showingPlayer = true }
-            }
+        .tabViewBottomAccessory(isEnabled: playerManager.currentTrack != nil) {
+            MiniPlayerView { showingPlayer = true }
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
         }
+        .animation(.easeInOut(duration: 0.2), value: playerManager.currentTrack?.id)
         .sheet(isPresented: $showingPlayer) { NavigationStack { PlayerView() } }
         .task(id: authViewModel.currentUser?.id) {
             guard let userId = authViewModel.currentUser?.id else {

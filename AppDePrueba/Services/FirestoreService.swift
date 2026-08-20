@@ -6,10 +6,15 @@ enum PlaylistServiceError: Error, Equatable {
     case unauthenticated, invalidInviteCode, inviteNotFound, inviteInactive
     case alreadyMember, notCollaborative, inviteCollision
     case duplicateTrack
+    case playlistNotPublic, alreadyAuthorized, invalidFollowReference
 }
 
 protocol FirestoreServiceProtocol {
-    func createPlaylist(name: String, description: String, isCollaborative: Bool, owner: AppUser) async throws -> Playlist
+    func createPlaylist(name: String, description: String, isCollaborative: Bool, visibility: PlaylistVisibility, owner: AppUser) async throws -> Playlist
+    func updatePlaylist(_ playlist: Playlist, name: String, description: String, visibility: PlaylistVisibility, user: AppUser) async throws
+    func searchPublicPlaylists(query: String, limit: Int) async throws -> [Playlist]
+    func followPlaylist(_ playlist: Playlist, user: AppUser) async throws
+    func unfollowPlaylist(_ playlist: Playlist, user: AppUser) async throws
     func observeLibrary(userId: String, onChange: @escaping (Result<PlaylistLibrary, Error>) -> Void) -> ListenerRegistration?
     func observeTracks(playlistId: String, onChange: @escaping (Result<[Track], Error>) -> Void) -> ListenerRegistration
     func observeMembers(playlistId: String, onChange: @escaping (Result<[PlaylistMember], Error>) -> Void) -> ListenerRegistration
@@ -20,7 +25,7 @@ protocol FirestoreServiceProtocol {
 final class FirestoreService: FirestoreServiceProtocol {
     private var database: Firestore { Firestore.firestore() }
 
-    func createPlaylist(name: String, description: String, isCollaborative: Bool, owner: AppUser) async throws -> Playlist {
+    func createPlaylist(name: String, description: String, isCollaborative: Bool, visibility: PlaylistVisibility, owner: AppUser) async throws -> Playlist {
         guard let userId = Auth.auth().currentUser?.uid, userId == owner.id else {
             throw PlaylistServiceError.unauthenticated
         }
@@ -29,9 +34,9 @@ final class FirestoreService: FirestoreServiceProtocol {
             let reference = database.collection("playlists").document()
             let playlist = Playlist(
                 id: reference.documentID, name: name, description: description,
-                ownerId: userId, imageURL: nil,
+                ownerId: userId, ownerDisplayName: owner.displayName, imageURL: nil,
                 joinCode: isCollaborative ? JoinCodeGenerator.generate() : nil,
-                isCollaborative: isCollaborative, visibility: .privateOnly,
+                isCollaborative: isCollaborative, visibility: visibility,
                 createdAt: .now, updatedAt: .now, trackCount: 0, memberCount: 1
             )
             do {
@@ -42,6 +47,84 @@ final class FirestoreService: FirestoreServiceProtocol {
             }
         }
         throw PlaylistServiceError.inviteCollision
+    }
+
+    func updatePlaylist(
+        _ playlist: Playlist,
+        name: String,
+        description: String,
+        visibility: PlaylistVisibility,
+        user: AppUser
+    ) async throws {
+        guard let userId = Auth.auth().currentUser?.uid,
+              userId == user.id,
+              userId == playlist.ownerId else { throw PlaylistServiceError.unauthenticated }
+        try await database.collection("playlists").document(playlist.id).updateData([
+            "name": name,
+            "description": description,
+            "visibility": visibility.rawValue,
+            "normalizedName": PlaylistSearchNormalizer.normalize(name),
+            "searchPrefixes": PlaylistSearchNormalizer.searchPrefixes(for: name),
+            "updatedAt": FieldValue.serverTimestamp()
+        ])
+    }
+
+    func searchPublicPlaylists(query: String, limit: Int) async throws -> [Playlist] {
+        guard Auth.auth().currentUser != nil else { throw PlaylistServiceError.unauthenticated }
+        guard let term = PlaylistSearchNormalizer.queryTerm(query) else { return [] }
+        let snapshot = try await database.collection("playlists")
+            .whereField("visibility", isEqualTo: PlaylistVisibility.publicVisible.rawValue)
+            .whereField("searchPrefixes", arrayContains: term)
+            .limit(to: max(1, min(limit, 20)))
+            .getDocuments()
+        return snapshot.documents.compactMap(Playlist.init(document:))
+    }
+
+    func followPlaylist(_ playlist: Playlist, user: AppUser) async throws {
+        guard let userId = Auth.auth().currentUser?.uid, userId == user.id else {
+            throw PlaylistServiceError.unauthenticated
+        }
+        let playlistReference = database.collection("playlists").document(playlist.id)
+        guard let currentPlaylist = Playlist(document: try await playlistReference.getDocument()),
+              currentPlaylist.visibility == .publicVisible else {
+            throw PlaylistServiceError.playlistNotPublic
+        }
+        guard currentPlaylist.ownerId != userId else {
+            throw PlaylistServiceError.alreadyAuthorized
+        }
+
+        let indexReference = database.collection("userPlaylists").document(userId)
+            .collection("items").document(playlist.id)
+        if let existingType = try await indexReference.getDocument().data()?["type"] as? String {
+            if existingType == UserPlaylistType.followed.rawValue { return }
+            throw PlaylistServiceError.alreadyAuthorized
+        }
+
+        let batch = database.batch()
+        batch.setData([
+            "userId": userId,
+            "followedAt": FieldValue.serverTimestamp()
+        ], forDocument: playlistReference.collection("followers").document(userId))
+        batch.setData(indexData(playlistId: playlist.id, role: .viewer, type: .followed),
+                      forDocument: indexReference)
+        try await batch.commit()
+    }
+
+    func unfollowPlaylist(_ playlist: Playlist, user: AppUser) async throws {
+        guard let userId = Auth.auth().currentUser?.uid, userId == user.id else {
+            throw PlaylistServiceError.unauthenticated
+        }
+        let indexReference = database.collection("userPlaylists").document(userId)
+            .collection("items").document(playlist.id)
+        let indexSnapshot = try await indexReference.getDocument()
+        guard indexSnapshot.data()?["type"] as? String == UserPlaylistType.followed.rawValue else {
+            throw PlaylistServiceError.invalidFollowReference
+        }
+        let batch = database.batch()
+        batch.deleteDocument(database.collection("playlists").document(playlist.id)
+            .collection("followers").document(userId))
+        batch.deleteDocument(indexReference)
+        try await batch.commit()
     }
 
     func observeLibrary(userId: String, onChange: @escaping (Result<PlaylistLibrary, Error>) -> Void) -> ListenerRegistration? {
@@ -62,10 +145,26 @@ final class FirestoreService: FirestoreServiceProtocol {
                     do {
                         var library = PlaylistLibrary.empty
                         for entry in entries {
-                            let document = try await self.database.collection("playlists").document(entry.playlistId).getDocument()
-                            guard let playlist = Playlist(document: document) else { continue }
-                            if entry.type == .owned { library.owned.append(playlist) }
-                            else { library.collaborative.append(playlist) }
+                            do {
+                                let document = try await self.database.collection("playlists").document(entry.playlistId).getDocument()
+                                guard let playlist = Playlist(document: document) else { continue }
+                                switch entry.type {
+                                case .owned:
+                                    library.owned.append(playlist)
+                                    library.editablePlaylistIDs.insert(playlist.id)
+                                case .collaborative:
+                                    library.collaborative.append(playlist)
+                                    if entry.role.canEditTracks {
+                                        library.editablePlaylistIDs.insert(playlist.id)
+                                    }
+                                case .followed: library.followed.append(playlist)
+                                }
+                            } catch {
+                                if entry.type == .followed {
+                                    try? await self.database.collection("userPlaylists").document(userId)
+                                        .collection("items").document(entry.playlistId).delete()
+                                }
+                            }
                         }
                         // Compatibilidad con playlists creadas antes de existir userPlaylists.
                         let legacyOwned = try await self.database.collection("playlists")
@@ -73,8 +172,10 @@ final class FirestoreService: FirestoreServiceProtocol {
                             .documents.compactMap(Playlist.init(document:))
                         let indexedOwnedIds = Set(library.owned.map(\.id))
                         library.owned.append(contentsOf: legacyOwned.filter { !indexedOwnedIds.contains($0.id) })
+                        library.editablePlaylistIDs.formUnion(legacyOwned.map(\.id))
                         library.owned.sort { $0.updatedAt > $1.updatedAt }
                         library.collaborative.sort { $0.updatedAt > $1.updatedAt }
+                        library.followed.sort { $0.updatedAt > $1.updatedAt }
                         await MainActor.run { onChange(.success(library)) }
                     } catch {
                         await MainActor.run { onChange(.failure(error)) }
@@ -136,6 +237,7 @@ final class FirestoreService: FirestoreServiceProtocol {
         batch.setData(member, forDocument: memberReference)
         batch.setData(indexData(playlistId: playlistId, role: .editor, type: .collaborative),
                       forDocument: database.collection("userPlaylists").document(userId).collection("items").document(playlistId))
+        batch.deleteDocument(playlistReference.collection("followers").document(userId))
         try await batch.commit()
         return playlist
     }
@@ -233,6 +335,7 @@ final class FirestoreService: FirestoreServiceProtocol {
 private struct UserPlaylistEntry {
     let playlistId: String
     let type: UserPlaylistType
+    let role: PlaylistRole
     nonisolated init?(document: QueryDocumentSnapshot) {
         let data = document.data()
         guard let playlistId = data["playlistId"] as? String,
@@ -240,6 +343,7 @@ private struct UserPlaylistEntry {
               let type = UserPlaylistType(rawValue: value) else { return nil }
         self.playlistId = playlistId
         self.type = type
+        self.role = (data["role"] as? String).flatMap(PlaylistRole.init(rawValue:)) ?? .viewer
     }
 }
 
@@ -247,7 +351,10 @@ extension Playlist {
     var firestoreDataWithServerTimestamps: [String: Any] {
         var data: [String: Any] = [
             "id": id, "name": name, "description": description, "ownerId": ownerId,
+            "ownerDisplayName": ownerDisplayName,
             "isCollaborative": isCollaborative, "visibility": visibility.rawValue,
+            "normalizedName": PlaylistSearchNormalizer.normalize(name),
+            "searchPrefixes": PlaylistSearchNormalizer.searchPrefixes(for: name),
             "createdAt": FieldValue.serverTimestamp(), "updatedAt": FieldValue.serverTimestamp(),
             "trackCount": trackCount, "memberCount": memberCount
         ]
@@ -262,13 +369,16 @@ extension Playlist {
         self.init(
             id: document.documentID, name: name,
             description: data["description"] as? String ?? "", ownerId: ownerId,
+            ownerDisplayName: data["ownerDisplayName"] as? String ?? "Propietario",
             imageURL: (data["imageURL"] as? String).flatMap(URL.init(string:)),
             joinCode: data["joinCode"] as? String,
             isCollaborative: data["isCollaborative"] as? Bool ?? false,
-            visibility: (data["visibility"] as? String).flatMap(PlaylistVisibility.init(rawValue:)) ?? .privateOnly,
+            visibility: PlaylistVisibility.fromFirestore(data["visibility"]),
             createdAt: (data["createdAt"] as? Timestamp)?.dateValue() ?? .distantPast,
             updatedAt: (data["updatedAt"] as? Timestamp)?.dateValue() ?? .distantPast,
-            trackCount: data["trackCount"] as? Int ?? 0, memberCount: data["memberCount"] as? Int ?? 1
+            trackCount: data["trackCount"] as? Int ?? 0, memberCount: data["memberCount"] as? Int ?? 1,
+            normalizedName: data["normalizedName"] as? String ?? PlaylistSearchNormalizer.normalize(name),
+            searchPrefixes: data["searchPrefixes"] as? [String] ?? []
         )
     }
 }

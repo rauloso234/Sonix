@@ -7,6 +7,7 @@ struct CreatePlaylistView: View {
     @State private var name = ""
     @State private var description = ""
     @State private var isCollaborative = false
+    @State private var visibility: PlaylistVisibility = .privateOnly
 
     var body: some View {
         NavigationStack {
@@ -21,6 +22,19 @@ struct CreatePlaylistView: View {
                     Toggle("Playlist colaborativa", isOn: $isCollaborative)
                 } footer: {
                     Text("Si la haces colaborativa, se generará un código para invitar a otras personas.")
+                }
+
+                Section("Visibilidad") {
+                    Picker("Visibilidad", selection: $visibility) {
+                        Text("Privada").tag(PlaylistVisibility.privateOnly)
+                        Text("Pública").tag(PlaylistVisibility.publicVisible)
+                    }
+                    .pickerStyle(.segmented)
+                    Text(visibility == .publicVisible
+                         ? "Cualquier usuario puede encontrarla y escucharla."
+                         : "Solo tú y los colaboradores autorizados pueden acceder.")
+                        .font(.footnote)
+                        .foregroundStyle(AppTheme.Colors.secondaryText)
                 }
 
                 if let errorMessage = playlistViewModel.errorMessage {
@@ -43,6 +57,7 @@ struct CreatePlaylistView: View {
                                 name: name,
                                 description: description,
                                 isCollaborative: isCollaborative,
+                                visibility: visibility,
                                 owner: owner
                             )
                             if created { dismiss() }

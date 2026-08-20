@@ -26,7 +26,16 @@ struct YouTubeKitMusicProvider: MusicProviderProtocol {
         do {
             let streams = try await YouTube(videoID: videoId, methods: [.local]).streams
             try Task.checkCancellation()
-            return try Self.selectBestAudioStream(from: streams).url
+            let selectedStream = try Self.selectBestAudioStream(from: streams)
+            #if DEBUG
+            print("""
+            [Player] Selected stream for videoId: \(videoId)
+            [Player] mimeType: audio/\(selectedStream.fileExtension)
+            [Player] codec: \(String(describing: selectedStream.audioCodec))
+            [Player] bitrate: \(selectedStream.averageBitrate ?? selectedStream.bitrate ?? 0)
+            """)
+            #endif
+            return selectedStream.url
         } catch is CancellationError {
             throw MusicProviderError.cancelled
         } catch let error as MusicProviderError {

@@ -20,6 +20,11 @@ struct LibraryView: View {
                             emptyMessage: "No has creado ninguna playlist."
                         )
                         playlistSection(
+                            title: "Siguiendo",
+                            playlists: playlistViewModel.followedPlaylists,
+                            emptyMessage: "No sigues ninguna playlist pública."
+                        )
+                        playlistSection(
                             title: "Playlists colaborativas",
                             playlists: playlistViewModel.collaborativePlaylists,
                             emptyMessage: "No te has unido a ninguna playlist colaborativa."

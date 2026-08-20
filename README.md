@@ -1,4 +1,4 @@
-# AppDePrueba — plataforma musical social
+# Sonix — plataforma musical social
 
 Aplicación educativa para iPhone construida exclusivamente con SwiftUI. El proyecto seguirá MVVM y separará la interfaz, el dominio, Firebase y el proveedor de contenido.
 
@@ -33,8 +33,17 @@ Las **Fases 1, 2 y 3**, junto con la primera parte de la Fase 4, están completa
 - búsqueda musical real mediante Piped, desacoplada tras `MusicProviderProtocol`;
 - resolución local de streams con YouTubeKit 0.4.9 y reproducción global mediante AVPlayer;
 - mini-player, reproductor completo, cola y guardado de canciones en playlists.
+- mini-player integrado con la barra de pestañas nativa de iOS 26;
+- audio en segundo plano, pantalla bloqueada y controles remotos del sistema;
+- gestión de interrupciones de audio y desconexión de auriculares.
+- duración efectiva coherente entre búsqueda, reproductor y pantalla bloqueada;
+- avance automático de la cola desde búsquedas y playlists;
+- target de pruebas unitarias para duración y navegación de cola.
+- playlists públicas buscables mediante prefijos normalizados y seguimiento persistente;
+- Biblioteca separada en propias, colaborativas y seguidas;
+- Autoplay runtime con recomendaciones, deduplicación, historial limitado y prefetch de metadata.
 
-Firebase está conectado mediante un `GoogleService-Info.plist` local. Authentication y la primera parte de Firestore están implementados. La colaboración completa y la búsqueda musical siguen pendientes.
+Firebase está conectado mediante un `GoogleService-Info.plist` local. La autenticación, las playlists colaborativas, la búsqueda musical y la reproducción están implementadas.
 
 El Bundle Identifier registrado en Firebase y configurado en Xcode es `com.raulfernandez.AppDePrueb`.
 
@@ -102,7 +111,7 @@ Desde Xcode selecciona un simulador y ejecuta el esquema. Mientras Firebase no e
 
 ## 15. Ejecutar tests
 
-El target de tests y sus mocks se añadirá en la fase de pruebas. Una vez creado, podrán ejecutarse con Product > Test en Xcode o mediante `xcodebuild test` con un destino de simulador.
+El proyecto incluye el target `AppDePruebaTests` con pruebas de cola, avance automático, autoplay, precarga, recomendaciones y permisos de playlists. Pueden ejecutarse con Product > Test en Xcode o mediante `xcodebuild test` con un destino de simulador.
 
 ## Arquitectura
 
@@ -118,6 +127,18 @@ Las Views no accederán directamente a Firebase ni al proveedor musical. Los rep
 
 La búsqueda utiliza el endpoint `/search` de Piped mediante una URL base centralizada. La reproducción no depende de los streams de Piped: YouTubeKit resuelve en el dispositivo una URL temporal a partir de `videoId`, y AVPlayer la reproduce. Las URLs temporales nunca se persisten en Firestore.
 
+Autoplay utiliza el mismo buscador Piped como fallback de recomendaciones porque la integración instalada de YouTubeKit no expone contenido relacionado. Las recomendaciones solo amplían la cola en memoria y nunca modifican playlists de Firestore.
+
+El reproductor prepara los metadatos de recomendaciones cuando quedan aproximadamente 20 segundos y resuelve únicamente la siguiente URL temporal cuando quedan 12 segundos. La precarga se cancela al cambiar de sesión o de cola y nunca se guarda en Firestore. El final efectivo de los metadatos también activa el avance, evitando esperas cuando la duración interna del recurso multimedia es incorrecta.
+
+Las recomendaciones normalizan títulos únicamente para comparación, descartan otras versiones del mismo tema, comparan también con el historial reciente y mezclan hasta cuatro búsquedas de estilo/artistas. Un ranking sencillo favorece estilos comunes y artistas diferentes; la selección evita artistas consecutivos iguales cuando existen alternativas.
+
+Inicio muestra la reproducción actual, hasta 20 canciones recientes, playlists propias, colaborativas y seguidas, y recomendaciones basadas en las últimas canciones. Las recomendaciones se mantienen 15 minutos durante la sesión y pueden actualizarse con pull-to-refresh.
+
+El historial se guarda, sin URLs de reproducción, en `users/{uid}/recentlyPlayed/{videoId}` cuando el recurso está listo y comienza a reproducirse. `playedAt` utiliza la hora del servidor y Home consulta como máximo 20 documentos ordenados de más reciente a más antiguo.
+
+Desde el reproductor se puede añadir la canción actual a playlists propias o colaborativas con permiso de edición. El detalle de playlist presenta las acciones editables en una cuadrícula de dos columnas.
+
 ## Plan de fases
 
 1. Base SwiftUI, modelos, navegación y tema — completada.
@@ -127,8 +148,8 @@ La búsqueda utiliza el endpoint `/search` de Piped mediante una URL base centra
 5. Colaboración y tiempo real — biblioteca, miembros e invitaciones completados; edición de canciones pendiente del buscador.
 6. Proveedor de búsqueda — completado con Piped para búsqueda y YouTubeKit para reproducción.
 7. Buscador y debounce — completados; paginación pendiente.
-8. Reproductor AVPlayer — completado.
-9. Cola global y mini reproductor — completados.
+8. Reproductor AVPlayer y audio en segundo plano — completados.
+9. Cola global, mini reproductor y controles del sistema — completados.
 10. Miembros, compartir y permisos.
 11. Firestore Security Rules — base de propietarios, miembros y roles completada; ampliar junto con las funciones colaborativas.
-12. Tests y pulido.
+12. Tests y pulido — target inicial y pruebas del reproductor añadidos.

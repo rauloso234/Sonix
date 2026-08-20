@@ -8,6 +8,11 @@ enum AppError: LocalizedError, Equatable {
     case permissionDenied
     case notFound
     case unknown
+    case recommendationUnavailable
+    case playlistUnavailable
+    case playlistBecamePrivate
+    case followFailed
+    case unfollowFailed
 
     var errorDescription: String? {
         switch self {
@@ -18,6 +23,11 @@ enum AppError: LocalizedError, Equatable {
         case .permissionDenied: "No tienes permiso para realizar esta acción."
         case .notFound: "No hemos encontrado lo que buscas."
         case .unknown: "Ha ocurrido un error inesperado."
+        case .recommendationUnavailable: "No se encontraron canciones similares."
+        case .playlistUnavailable: "Esta playlist ya no está disponible."
+        case .playlistBecamePrivate: "Esta playlist ha pasado a ser privada."
+        case .followFailed: "No se pudo seguir la playlist."
+        case .unfollowFailed: "No se pudo dejar de seguir la playlist."
         }
     }
 }
